@@ -1,0 +1,98 @@
+# Exclusions & Local Rebuild Guide
+**Project:** *The Route* by Black P. Pull  
+**Repository:** [https://github.com/callen0817/book-theroute](https://github.com/callen0817/book-theroute)
+
+---
+
+## 1. Overview of Excluded Components
+
+To maintain repository portability, comply with GitHub's file size limits (< 100MB per file), and prevent environmental path conflicts across different operating systems, certain heavy binaries, virtual environments, model weights, and intermediate test caches are intentionally excluded from git via `.gitignore`.
+
+This document explicitly identifies every excluded item, explains its operational necessity, and provides exact steps to rebuild the environment locally.
+
+---
+
+## 2. Heavy Runtime Dependencies (Required for Operation)
+
+The following components are excluded from the repository but are required to run the local GPU-accelerated audiobook generator (`generate_audiobook.py`) and audio mastering suite (`clean_audio.py`):
+
+| Component / Artifact | Default Local Location | Size | Reason for Exclusion | Rebuild Mechanism |
+| :--- | :--- | :--- | :--- | :--- |
+| **Python Virtual Environment (`audiobook_env`)** | `C:\Users\%USERNAME%\audiobook_env` | ~5.8 GB | Python virtual environments contain machine-specific binaries, symlinks, and site-packages that cannot be committed to Git. | Recreated via `setup_environment.bat` or `python -m venv`. |
+| **PyTorch + CUDA 12.4 Runtime** | Inside `audiobook_env\Lib\site-packages\torch` | ~2.8 GB | NVIDIA GPU acceleration binaries (CUDA kernels, cuDNN) exceed GitHub file limits. | Reinstalled via `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124`. |
+| **F5-TTS Base Model Weights (`model_1250000.safetensors`)** | `~/.cache/huggingface/hub/models--SWivid--F5-TTS/` | ~1.3 GB | Pretrained neural flow-matching weights for voice cloning. | Auto-downloaded by Hugging Face Hub upon first execution of `generate_audiobook.py`. |
+| **Vocos Mel-24kHz Vocoder Weights** | `~/.cache/huggingface/hub/models--charactr--vocos-mel-24khz/` | ~50 MB | High-fidelity neural vocoder for decoding spectrograms into audio waveforms. | Auto-downloaded by Hugging Face Hub upon first execution. |
+| **Whisper ASR Model Weights** | `~/.cache/huggingface/hub/models--openai--whisper-large-v3-turbo/` | ~1.6 GB | Automatic speech recognition model used for reference audio alignment. | Auto-downloaded on first call to `transcribe()`. |
+| **FFmpeg Executable (`ffmpeg.exe`, `ffprobe.exe`)** | `audiobook_env\Lib\site-packages\static_ffmpeg\bin\` | ~120 MB | Pre-compiled multimedia encoding binary for MP3 conversion and DSP filters. | Auto-installed via the `static-ffmpeg` Python package. |
+
+---
+
+## 3. How to Rebuild the Runtime Environment Locally
+
+### Automated Rebuild (Windows)
+Double-click:
+```cmd
+setup_environment.bat
+```
+This automated script will:
+1. Initialize the virtual environment at `C:\Users\%USERNAME%\audiobook_env`.
+2. Install PyTorch with NVIDIA CUDA 12.4 acceleration.
+3. Install `requirements.txt` (including `f5-tts`, `soundfile`, `noisereduce`, `scipy`, `numpy>=2.0.0`, and `static-ffmpeg`).
+4. Validate that your GPU is detected and operational.
+
+---
+
+### Manual Rebuild (Command Line)
+If you prefer running commands manually:
+
+```powershell
+# 1. Create the virtual environment
+python -m venv C:\Users\%USERNAME%\audiobook_env
+
+# 2. Activate or call the environment Python directly
+$env_py = "C:\Users\$env:USERNAME\audiobook_env\Scripts\python.exe"
+
+# 3. Install PyTorch with CUDA 12.4 GPU support
+& $env_py -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# 4. Install F5-TTS, Audio DSP, and Project Dependencies
+& $env_py -m pip install -r requirements.txt
+
+# 5. Verify CUDA acceleration
+& $env_py -c "import torch; print('CUDA Available:', torch.cuda.is_available(), '| GPU:', torch.cuda.get_device_name(0))"
+```
+
+Once rebuilt, you can run:
+```cmd
+run_audiobook_generator.bat
+```
+to generate any chapter (or all 37 chapters) in your cloned voice.
+
+---
+
+## 4. Test Files & Intermediate Caches (Excluded from Upload)
+
+The following items are temporary caches, intermediate build files, or test outputs that are excluded via `.gitignore`:
+
+| Item / Pattern | Description | Impact if Missing |
+| :--- | :--- | :--- |
+| `all_chapters_temp.txt` | Intermediate concatenated text file created during chapter parsing. | None; chapters are maintained in `chapters/*.txt` and `The Route.txt`. |
+| `temp_*`, `*.tmp` | Temporary audio slices created during noise reduction. | None; master audio files (`Cairo_Voice_Cleaned.wav`) are preserved. |
+| `*.log` | Task and system execution logs generated during background runs. | None; relevant session milestones are documented in `docs/antigravity-history/`. |
+| `__pycache__/`, `*.pyc` | Python bytecode compiler caches. | Recompiled automatically by Python on execution. |
+| `.vscode/`, `.idea/` | IDE user workspace preferences and settings. | Developer-specific; automatically regenerated by editors. |
+| `Thumbs.db`, `.DS_Store` | Windows and macOS file explorer thumbnail caches. | System-generated; non-functional. |
+
+---
+
+## 5. Tracked Core Artifacts (Preserved in Git)
+
+To guarantee that the project can be rebuilt and produced anywhere, all essential source assets **are tracked and committed**:
+* ✅ Definitive Novel Manuscript (`The_Route_Final.docx`, `The Route.txt`, and 37 individual `chapters/*.txt`).
+* ✅ Character Guides & Summaries (`Character Name Guide.*`, `The Route_Summary.*`).
+* ✅ Comprehensive Cliff's Notes (`Cliffs_Notes_The_Route.docx/.md`).
+* ✅ Authentic Leonardo da Vinci Cover Art & Social Media Graphics (JPGs & PNGs).
+* ✅ High-Resolution Audio References & Cleaned Samples (`Cairo_Voice_Cleaned.*`, `Cairo_Voice_Mastered.wav`, `ref_voice_first_sentence.wav`).
+* ✅ Generated Chapter 1 Master Audio (`audiobook/Chapter_1__Embers_The_First_Steps.*`).
+* ✅ Production Scripts (`generate_audiobook.py`, `clean_audio.py`, `run_audiobook_generator.bat`, `setup_environment.bat`, `requirements.txt`).
+* ✅ Full Antigravity History & Transcripts (`docs/antigravity-history/`).
